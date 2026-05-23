@@ -3,12 +3,16 @@ import '../theme/legacy-aliases.css';
 import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
+import { showGlobalSuccessToast } from '../appUiState';
 import { connectionState } from '../appUiState';
 import AgentActivityDialog from '../components/agent/AgentActivityDialog.vue';
 import ConsoleAgentListPanel from '../components/console/ConsoleAgentListPanel.vue';
 import ConsoleChatPanel from '../components/console/ConsoleChatPanel.vue';
 import ConsoleRoomListPanel from '../components/console/ConsoleRoomListPanel.vue';
 import CreateRoomDialog from '../components/console/CreateRoomDialog.vue';
+import ConfirmDialog from '../components/ui/ConfirmDialog.vue';
+import { deleteTeamRoom } from '../api';
+import type { RoomState } from '../types';
 import { useAgentActivityDialogState } from '../composables/useAgentActivityDialogState';
 import { useConsoleRuntimeState } from '../composables/useConsoleRuntimeState';
 import { useConsoleSidebarLayout } from '../composables/useConsoleSidebarLayout';
@@ -259,6 +263,34 @@ onMounted(async () => {
   }
 });
 
+const deleteRoomConfirmOpen = ref(false);
+const roomToDelete = ref<RoomState | null>(null);
+
+function handleOpenDeleteRoomDialog(room: RoomState): void {
+  roomToDelete.value = room;
+  deleteRoomConfirmOpen.value = true;
+}
+
+async function handleConfirmDeleteRoom(): Promise<void> {
+  if (!roomToDelete.value || !teamId.value) {
+    return;
+  }
+  const roomId = roomToDelete.value.room_id;
+  deleteRoomConfirmOpen.value = false;
+  
+  try {
+    loading.value = true;
+    await deleteTeamRoom(teamId.value, roomId);
+    showGlobalSuccessToast(t('room.deleteSuccess') || '聊天室删除成功');
+    await refreshAll();
+  } catch (error) {
+    console.error('删除聊天室失败:', error);
+  } finally {
+    roomToDelete.value = null;
+    loading.value = false;
+  }
+}
+
 onBeforeUnmount(() => {
   if (mobileLayoutMediaQuery) {
     mobileLayoutMediaQuery.removeEventListener('change', handleMobileLayoutChange);
@@ -278,6 +310,7 @@ onBeforeUnmount(() => {
         :current-room-id="selectedRoomId"
         @select-room="handleSelectRoom"
         @create-room="openCreateRoomDialog"
+        @delete-room="handleOpenDeleteRoomDialog"
       />
 
       <button
@@ -392,6 +425,7 @@ onBeforeUnmount(() => {
               :current-room-id="selectedRoomId"
               @select-room="handleSelectRoom"
               @create-room="openCreateRoomDialog"
+              @delete-room="handleOpenDeleteRoomDialog"
             />
 
             <ConsoleAgentListPanel
@@ -413,6 +447,15 @@ onBeforeUnmount(() => {
       :agent-status="selectedAgentStatus"
       :role-template-name="selectedAgentTemplateName"
       @close="closeAgentDetail"
+    />
+
+    <ConfirmDialog
+      :open="deleteRoomConfirmOpen"
+      title="删除聊天室"
+      :message="`确定要删除聊天室“${roomToDelete ? i18nText(roomToDelete.i18n, 'display_name', roomToDelete.room_name) : ''}”吗？此操作将永久清空该聊天室的所有历史消息记录且不可恢复。`"
+      confirm-label="确定删除"
+      @close="deleteRoomConfirmOpen = false"
+      @confirm="handleConfirmDeleteRoom"
     />
   </div>
 </template>

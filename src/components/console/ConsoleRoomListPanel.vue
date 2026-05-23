@@ -3,9 +3,12 @@ import { computed } from 'vue';
 import { useTeamAgents, useTeamRooms } from '../../realtime/selectors';
 import RoomListSection from './RoomListSection.vue';
 
+import type { RoomState } from '../../types';
+
 const emit = defineEmits<{
   selectRoom: [roomId: number];
   createRoom: [];
+  deleteRoom: [room: RoomState];
 }>();
 
 const props = defineProps<{
@@ -28,6 +31,7 @@ const createDisabled = computed(() => props.loading || !agents.value.length);
       :create-disabled="createDisabled"
       @select-room="emit('selectRoom', $event)"
       @create-room="emit('createRoom')"
+      @delete-room="emit('deleteRoom', $event)"
     />
   </div>
 </template>

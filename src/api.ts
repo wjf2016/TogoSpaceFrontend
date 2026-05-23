@@ -644,6 +644,12 @@ export async function createTeamRoom(teamId: number, payload: {
   });
 }
 
+export async function deleteTeamRoom(teamId: number, roomId: number): Promise<{ status: string; room_name: string }> {
+  return requestJson(`/teams/${teamId}/rooms/${roomId}/delete.json`, {
+    method: 'POST',
+  });
+}
+
 export async function getTeams(): Promise<TeamSummary[]> {
   const data = await requestJson<{ teams: RawTeamSummary[] }>('/teams/list.json');
   return data.teams.map(normalizeTeamSummary);

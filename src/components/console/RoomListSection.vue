@@ -13,6 +13,7 @@ defineProps<{
 const emit = defineEmits<{
   selectRoom: [roomId: number];
   createRoom: [];
+  deleteRoom: [room: RoomState];
 }>();
 
 const { t } = useI18n();
@@ -44,12 +45,11 @@ function isDeptRoom(room: RoomState): boolean {
       <div v-if="loading" class="placeholder">{{ t('room.syncing') }}</div>
 
       <template v-else-if="rooms.length > 0">
-        <button
+        <div
           v-for="room in rooms"
           :key="room.room_id"
           class="room-card sidebar-item-card"
           :class="{ selected: room.room_id === currentRoomId }"
-          type="button"
           @click="emit('selectRoom', room.room_id)"
         >
           <div class="room-head">
@@ -71,7 +71,16 @@ function isDeptRoom(room: RoomState): boolean {
             </div>
           </div>
           <p class="room-preview">{{ room.preview }}</p>
-        </button>
+          <button
+            v-if="!isDeptRoom(room)"
+            type="button"
+            class="room-delete-btn"
+            :aria-label="t('room.deleteRoom') || '删除房间'"
+            @click.stop="emit('deleteRoom', room)"
+          >
+            <i class="fa-regular fa-trash-can"></i>
+          </button>
+        </div>
       </template>
 
       <div v-else class="placeholder">{{ t('room.noRooms') }}</div>
@@ -209,6 +218,11 @@ function isDeptRoom(room: RoomState): boolean {
   color: var(--text-secondary);
   font-size: 0.72rem;
   white-space: nowrap;
+  transition: opacity 0.15s ease;
+}
+
+.room-card:hover .room-meta {
+  opacity: 0;
 }
 
 .room-preview {
@@ -266,5 +280,45 @@ function isDeptRoom(room: RoomState): boolean {
   opacity: 0.56;
   cursor: not-allowed;
   transform: none;
+}
+
+.room-card {
+  position: relative;
+}
+
+.room-delete-btn {
+  opacity: 0;
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface-panel);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.75rem;
+  transition:
+    opacity 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.room-card:hover .room-delete-btn {
+  opacity: 1;
+}
+
+.room-delete-btn:hover {
+  color: var(--state-danger);
+  border-color: var(--state-danger);
+}
+
+.room-preview {
+  padding-right: 24px;
 }
 </style>

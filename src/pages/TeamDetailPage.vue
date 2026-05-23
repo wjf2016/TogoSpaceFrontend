@@ -2,9 +2,10 @@
 import '../theme/legacy-aliases.css';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { totalMessageCount } from '../appUiState';
-import { getAgentsByTeamId, getTeamDetail } from '../api';
+import { showGlobalSuccessToast, totalMessageCount } from '../appUiState';
+import { deleteTeamRoom, getAgentsByTeamId, getTeamDetail } from '../api';
 import AgentActivityDialog from '../components/agent/AgentActivityDialog.vue';
+import ConfirmDialog from '../components/ui/ConfirmDialog.vue';
 import TeamInfoCard from '../components/team/TeamInfoCard.vue';
 import TeamMembersCard from '../components/team/TeamMembersCard.vue';
 import { loadRoleTemplates } from '../realtime/runtimeStore';
@@ -104,6 +105,36 @@ function closeAgentDetail(): void {
   selectedAgentId.value = null;
 }
 
+const deleteRoomConfirmOpen = ref(false);
+const roomToDelete = ref<any | null>(null);
+
+function isDeptRoom(room: any): boolean {
+  return Array.isArray(room.tags) && room.tags.includes('DEPT');
+}
+
+function requestDeleteRoom(room: any): void {
+  roomToDelete.value = room;
+  deleteRoomConfirmOpen.value = true;
+}
+
+async function confirmDeleteRoom(): Promise<void> {
+  if (!roomToDelete.value || !teamId.value) {
+    return;
+  }
+  deleteRoomConfirmOpen.value = false;
+  try {
+    loading.value = true;
+    await deleteTeamRoom(teamId.value, roomToDelete.value.id);
+    showGlobalSuccessToast('聊天室删除成功');
+    await loadDetail();
+  } catch (error) {
+    console.error('删除房间失败:', error);
+  } finally {
+    roomToDelete.value = null;
+    loading.value = false;
+  }
+}
+
 watch(() => route.params.teamId, () => {
   loadDetail().catch(console.error);
 });
@@ -147,10 +178,9 @@ onMounted(() => {
           </div>
 
           <div class="rooms-grid">
-            <button
+            <div
               v-for="room in team.rooms"
               :key="room.id"
-              type="button"
               class="room-tile"
               @click="openRoom(room.id)"
             >
@@ -163,7 +193,16 @@ onMounted(() => {
                 <span>max_turns {{ room.max_turns }}</span>
                 <span>{{ roomMemberNames(room.id).join(' / ') }}</span>
               </div>
-            </button>
+              <button
+                v-if="!isDeptRoom(room)"
+                type="button"
+                class="tile-delete-btn"
+                :aria-label="t('room.deleteRoom') || '删除房间'"
+                @click.stop="requestDeleteRoom(room)"
+              >
+                <i class="fa-regular fa-trash-can"></i>
+              </button>
+            </div>
 
             <div v-if="!team.rooms.length" class="empty-state">
               当前团队还没有房间。
@@ -180,6 +219,15 @@ onMounted(() => {
       :agent-status="selectedAgentStatus"
       :role-template-name="selectedAgentTemplateName"
       @close="closeAgentDetail"
+    />
+
+    <ConfirmDialog
+      :open="deleteRoomConfirmOpen"
+      title="删除聊天室"
+      :message="`确定要删除聊天室“${roomToDelete ? i18nText(roomToDelete.i18n, 'display_name', roomToDelete.name) : ''}”吗？此操作将永久清空该聊天室的所有历史消息记录且不可恢复。`"
+      confirm-label="确定删除"
+      @close="deleteRoomConfirmOpen = false"
+      @confirm="confirmDeleteRoom"
     />
   </section>
 </template>
@@ -274,6 +322,37 @@ onMounted(() => {
     border-color 0.18s ease,
     background 0.18s ease,
     transform 0.18s ease;
+  position: relative;
+}
+
+.tile-delete-btn {
+  opacity: 0;
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface-panel);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    opacity 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.room-tile:hover .tile-delete-btn {
+  opacity: 1;
+}
+
+.tile-delete-btn:hover {
+  color: var(--state-danger);
+  border-color: var(--state-danger);
 }
 
 .room-tile:hover {
@@ -303,6 +382,7 @@ onMounted(() => {
   margin: 8px 0;
   font-size: 0.78rem;
   line-height: 1.4;
+  padding-right: 28px;
 }
 
 .room-tile-meta {
